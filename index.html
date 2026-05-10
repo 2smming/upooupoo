@@ -446,7 +446,7 @@
         </div>
         <div id="rp-weekly" class="recur-block-body hidden">
           <div id="weekly-groups"></div>
-          <button type="button" class="add-group-btn" onclick="addWeeklyGroup()">+ 시간 그룹 추가</button>
+          <button type="button" class="add-group-btn" onclick="addWeeklyGroup()">+ 회차 추가</button>
         </div>
       </div>
 
@@ -743,25 +743,24 @@ function matchesMonthlyRecur(monthly,d) {
 // ── Block time resolution ──────────────────────────────────
 function getBlockTimesAll(s,d) {
   const r=s.recurrence;
+  const cap=g=>({start:g.startTime,end:g.endTime,capacity:g.capacity||null});
   if(r&&r.type==='combined') {
     if(r.weekly&&matchesWeeklyRecur(r.weekly,d)) {
       const gs=(r.weekly.groups||[]).filter(g=>(g.days||[]).includes(d.getDay()));
-      if(gs.length) return gs.map(g=>({start:g.startTime,end:g.endTime}));
+      if(gs.length) return gs.map(cap);
     }
-    if(r.monthly&&matchesMonthlyRecur(r.monthly,d)) {
-      return (r.monthly.groups||[]).map(g=>({start:g.startTime,end:g.endTime}));
-    }
+    if(r.monthly&&matchesMonthlyRecur(r.monthly,d))
+      return (r.monthly.groups||[]).map(cap);
   }
   if(r&&r.type==='weekly'&&r.groups&&r.groups.length>0) {
     const gs=r.groups.filter(g=>(g.days||[]).includes(d.getDay()));
-    if(gs.length) return gs.map(g=>({start:g.startTime,end:g.endTime}));
+    if(gs.length) return gs.map(cap);
   }
-  if(r&&r.type==='monthly'&&r.groups&&r.groups.length>0) {
-    return r.groups.map(g=>({start:g.startTime,end:g.endTime}));
-  }
+  if(r&&r.type==='monthly'&&r.groups&&r.groups.length>0)
+    return r.groups.map(cap);
   if(r&&r.type==='weekly'&&r.splitByWeekend&&[0,6].includes(d.getDay())&&r.weekendStart)
-    return [{start:r.weekendStart,end:r.weekendEnd}];
-  return [{start:s.startTime,end:s.endTime}];
+    return [{start:r.weekendStart,end:r.weekendEnd,capacity:null}];
+  return [{start:s.startTime,end:s.endTime,capacity:null}];
 }
 
 // ── Render ─────────────────────────────────────────────────
@@ -813,10 +812,11 @@ function renderBlock(s,d) {
   const isRecur=s.recurrence&&s.recurrence.type!=='none';
   const lanesStr=s.lanes?`레인 ${s.lanes}개`:'';
   const priceStr=s.price?fmtPrice(s.price):'';
-  const meta1=[lanesStr,priceStr].filter(Boolean).join(' · ');
   const staTags=toArr(s.station),locTags=toArr(s.location);
   const meta2=staTags.length?`🚇 ${staTags.join(' · ')}`:locTags.length?`📍 ${locTags.join(' · ')}`:'';
-  return getBlockTimesAll(s,d).map(({start,end})=>{
+  return getBlockTimesAll(s,d).map(({start,end,capacity})=>{
+    const capStr=capacity?`${capacity}명`:'';
+    const meta1=[lanesStr,capStr,priceStr].filter(Boolean).join(' · ');
     const sm=t2m(start),em=t2m(end);
     const top=(sm-START_H*60)*PPM,h=(em-sm)*PPM;
     const tiny=h<26,small=h<48,med=h<72,big=h>=90;
@@ -940,7 +940,7 @@ function syncEndTime(type,gi,startVal) {
 
 // Weekly groups
 function addWeeklyGroup(){
-  weeklyGroups.push({days:[],startTime:'09:00',endTime:'10:00'});
+  weeklyGroups.push({days:[],startTime:'09:00',endTime:'09:50',capacity:null});
   renderWeeklyGroups();
 }
 function removeWeeklyGroup(gi){
@@ -958,7 +958,7 @@ function renderWeeklyGroups(){
   document.getElementById('weekly-groups').innerHTML=weeklyGroups.map((g,gi)=>`
     <div class="group-card">
       <div class="group-header">
-        <span class="group-num">그룹 ${gi+1}</span>
+        <span class="group-num">회차 ${gi+1}</span>
         ${weeklyGroups.length>1?`<button type="button" class="group-del" onclick="removeWeeklyGroup(${gi})">×</button>`:''}
       </div>
       <div class="toggle-buttons" style="margin-bottom:8px">
@@ -969,13 +969,18 @@ function renderWeeklyGroups(){
       <div class="form-row">
         <div class="form-group" style="margin-bottom:0">
           <label>시작</label>
-          <input type="time" min="08:00" max="22:00" value="${g.startTime||''}"
+          <input type="time" min="06:00" max="22:00" value="${g.startTime||''}"
             oninput="weeklyGroups[${gi}].startTime=this.value;syncEndTime('weekly',${gi},this.value)" />
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label>종료</label>
-          <input type="time" min="08:00" max="22:00" value="${g.endTime||''}"
+          <input type="time" min="06:00" max="22:00" value="${g.endTime||''}"
             oninput="weeklyGroups[${gi}].endTime=this.value" />
+        </div>
+        <div class="form-group" style="margin-bottom:0;max-width:72px">
+          <label>정원</label>
+          <input type="number" min="1" max="999" placeholder="명" value="${g.capacity||''}"
+            oninput="weeklyGroups[${gi}].capacity=this.value?parseInt(this.value):null" />
         </div>
       </div>
     </div>`).join('');
@@ -983,7 +988,7 @@ function renderWeeklyGroups(){
 
 // Monthly groups
 function addMonthlyGroup(){
-  monthlyGroups.push({startTime:'09:00',endTime:'09:50'});
+  monthlyGroups.push({startTime:'09:00',endTime:'09:50',capacity:null});
   renderMonthlyGroups();
 }
 function removeMonthlyGroup(gi){
@@ -1001,13 +1006,18 @@ function renderMonthlyGroups(){
       <div class="form-row">
         <div class="form-group" style="margin-bottom:0">
           <label>시작</label>
-          <input type="time" min="08:00" max="22:00" value="${g.startTime||''}"
+          <input type="time" min="06:00" max="22:00" value="${g.startTime||''}"
             oninput="monthlyGroups[${gi}].startTime=this.value;syncEndTime('monthly',${gi},this.value)" />
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label>종료</label>
-          <input type="time" min="08:00" max="22:00" value="${g.endTime||''}"
+          <input type="time" min="06:00" max="22:00" value="${g.endTime||''}"
             oninput="monthlyGroups[${gi}].endTime=this.value" />
+        </div>
+        <div class="form-group" style="margin-bottom:0;max-width:72px">
+          <label>정원</label>
+          <input type="number" min="1" max="999" placeholder="명" value="${g.capacity||''}"
+            oninput="monthlyGroups[${gi}].capacity=this.value?parseInt(this.value):null" />
         </div>
       </div>
     </div>`).join('');
@@ -1040,7 +1050,7 @@ function openModal(ds,startTime,endTime,prefDow){
 
   document.getElementById('modal-title').textContent='자유수영 등록';
   ['f-pool','f-lanes','f-notes'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('f-mo-dow').value='1';
+  document.getElementById('f-mo-dow').value='0';
   setPriceDisplay(null);
 
   updateRecurUI(); refreshNths(); buildSwatches();
@@ -1139,9 +1149,11 @@ function saveSession(){
   if(weeklyEnabled){
     document.querySelectorAll('#weekly-groups .group-card').forEach((card,gi)=>{
       const inputs=card.querySelectorAll('input[type="time"]');
+      const capEl=card.querySelector('input[type="number"]');
       if(weeklyGroups[gi]){
         weeklyGroups[gi].startTime=inputs[0]?inputs[0].value:weeklyGroups[gi].startTime;
         weeklyGroups[gi].endTime  =inputs[1]?inputs[1].value:weeklyGroups[gi].endTime;
+        weeklyGroups[gi].capacity =capEl&&capEl.value?parseInt(capEl.value):null;
       }
     });
     const vg=weeklyGroups.filter(g=>g.days.length>0);
@@ -1157,9 +1169,11 @@ function saveSession(){
     if(!selNths.length){alert('매월: 주차를 선택해 주세요.');return;}
     document.querySelectorAll('#monthly-groups .group-card').forEach((card,gi)=>{
       const inputs=card.querySelectorAll('input[type="time"]');
+      const capEl=card.querySelector('input[type="number"]');
       if(monthlyGroups[gi]){
         monthlyGroups[gi].startTime=inputs[0]?inputs[0].value:monthlyGroups[gi].startTime;
         monthlyGroups[gi].endTime  =inputs[1]?inputs[1].value:monthlyGroups[gi].endTime;
+        monthlyGroups[gi].capacity =capEl&&capEl.value?parseInt(capEl.value):null;
       }
     });
     const vmg=monthlyGroups.filter(g=>g.startTime&&g.endTime);
