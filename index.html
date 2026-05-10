@@ -20,9 +20,8 @@
       flex-shrink: 0; box-shadow: 0 2px 16px rgba(61,158,192,0.35); gap: 12px;
       border-bottom: 1px solid rgba(255,255,255,0.2);
     }
-    .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; white-space: nowrap; flex:1; }
-    .header-center { display: flex; align-items: center; gap: 12px; }
-    .header-right  { flex:1; display: flex; align-items: center; justify-content: flex-end; }
+    .header-left  { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; white-space: nowrap; }
     .tabs { display: flex; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 3px; gap: 2px; }
     .tab {
       padding: 4px 14px; border: none; background: transparent;
@@ -359,8 +358,8 @@
 <body>
 
 <header class="header">
-  <div class="header-title">🏊 자유수영 스케줄</div>
-  <div class="header-center">
+  <div class="header-left">
+    <div class="header-title">어푸어푸 자유수영</div>
     <div class="tabs">
       <button class="tab active" id="tab-weekly" onclick="setView('weekly')">주간</button>
       <button class="tab"        id="tab-daily"  onclick="setView('daily')">일간</button>
@@ -372,12 +371,10 @@
       <button class="today-btn" onclick="goToday()">오늘</button>
     </div>
   </div>
-  <div class="header-right">
-    <div class="auth-area">
-      <button class="auth-btn" id="signin-btn" onclick="signIn()">로그인</button>
-      <div id="user-info" style="display:none">
-        <img class="user-avatar" id="user-avatar" src="" alt="" onclick="toggleProfileMenu(event)" />
-      </div>
+  <div class="auth-area">
+    <button class="auth-btn" id="signin-btn" onclick="signIn()">로그인</button>
+    <div id="user-info" style="display:none">
+      <img class="user-avatar" id="user-avatar" src="" alt="" onclick="toggleProfileMenu(event)" />
     </div>
   </div>
 </header>
@@ -879,12 +876,12 @@ function updateNavLabel() {
   const el=document.getElementById('nav-label');
   if(view==='weekly'){
     const days=weekDays(curDate);
-    const mid=days[3]; // 목요일 기준으로 월 결정
+    const mid=days[3];
     const wk=getWeekOfMonth(mid);
-    el.textContent=`${mid.getFullYear()}년 ${mid.getMonth()+1}월 ${wk}째주`;
+    el.textContent=`${mid.getMonth()+1}월 ${wk}째주`;
   } else {
     const d=curDate;
-    el.textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${DAY_FULL[d.getDay()]}`;
+    el.textContent=`${d.getMonth()+1}월 ${d.getDate()}일 ${DAY_FULL[d.getDay()]}`;
   }
 }
 function navigate(dir){
