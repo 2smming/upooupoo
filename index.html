@@ -675,11 +675,18 @@ async function loadSessions() {
   if (currentUser) {
     try {
       const snap = await db.collection('users').doc(currentUser.uid).get();
-      sessions = snap.exists ? (snap.data().sessions || []) : [];
-    } catch(e) { console.error('Load error:', e); sessions = []; }
+      if (snap.exists && (snap.data().sessions||[]).length > 0) {
+        sessions = snap.data().sessions;
+        localStorage.setItem('swim-v2', JSON.stringify(sessions)); // 로컬 백업
+        return;
+      }
+    } catch(e) { console.error('Load error:', e); }
+    // Firestore 실패 또는 빈 경우 → 로컬 백업에서 복구
+    const v2=localStorage.getItem('swim-v2');
+    if(v2){ sessions=JSON.parse(v2); saveSessions(); return; }
+    sessions=[];
     return;
   }
-  // 비로그인: localStorage
   const v2=localStorage.getItem('swim-v2');
   if(v2){sessions=JSON.parse(v2);return;}
   const v1=localStorage.getItem('swim-v1');
@@ -693,11 +700,10 @@ async function loadSessions() {
   }
 }
 function saveSessions() {
+  localStorage.setItem('swim-v2', JSON.stringify(sessions)); // 항상 로컬 백업
   if (currentUser) {
     db.collection('users').doc(currentUser.uid).set({ sessions })
       .catch(e => console.error('Save error:', e));
-  } else {
-    localStorage.setItem('swim-v2', JSON.stringify(sessions));
   }
 }
 
