@@ -38,7 +38,8 @@
       transition: background 0.15s; line-height: 1;
     }
     .nav-btn:hover { background: rgba(255,255,255,0.28); }
-    .nav-label { font-size: 13px; font-weight: 600; min-width: 130px; text-align: center; }
+    .nav-label { font-size: 13px; font-weight: 600; min-width: 130px; text-align: center; cursor: pointer; border-radius: 6px; padding: 3px 6px; transition: background 0.15s; }
+    .nav-label:hover { background: rgba(255,255,255,0.18); }
     .today-btn {
       background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35);
       color: white; padding: 3px 11px; border-radius: 6px; cursor: pointer;
@@ -56,8 +57,6 @@
     .time-corner { width: 60px; flex-shrink: 0; border-right: 1px solid #e2e8f0; }
     .day-header { flex: 1; padding: 8px 4px; text-align: center; border-right: 1px solid #e2e8f0; user-select: none; }
     .day-header .day-name  { font-size: 11px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; }
-    .day-num-row { display: flex; align-items: baseline; justify-content: center; gap: 3px; }
-    .day-header .day-month { font-size: 10px; color: #94a3b8; font-weight: 500; }
     .day-header .day-num   { font-size: 22px; font-weight: 700; line-height: 1.25; color: #334155; }
     .day-header.today .day-num {
       color: white; background: #3d9ec0; width: 34px; height: 34px;
@@ -328,6 +327,33 @@
       font-family: inherit; cursor: pointer; transition: background 0.12s;
     }
     .profile-signout-btn:hover { background: #fee2e2; color: #e11d48; }
+
+    /* ── Date picker ── */
+    .date-picker {
+      position: fixed; background: white; border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18); padding: 16px;
+      z-index: 400; width: 236px;
+    }
+    .dp-year-row {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+    }
+    .dp-year-label { font-size: 15px; font-weight: 700; color: #1e293b; }
+    .dp-yr-btn {
+      background: #f1f5f9; border: none; border-radius: 6px; cursor: pointer;
+      width: 28px; height: 28px; font-size: 16px; color: #475569;
+      display: flex; align-items: center; justify-content: center; transition: background 0.12s;
+    }
+    .dp-yr-btn:hover { background: #e2e8f0; }
+    .dp-months {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    }
+    .dp-mon-btn {
+      padding: 8px 2px; border: none; border-radius: 7px; background: #f8fafc;
+      cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit;
+      color: #334155; transition: background 0.12s, color 0.12s;
+    }
+    .dp-mon-btn:hover { background: #e0f3fa; color: #2a7fa0; }
+    .dp-mon-btn.cur { background: #3d9ec0; color: white; }
   </style>
 </head>
 <body>
@@ -341,7 +367,7 @@
     </div>
     <div class="nav-group">
       <button class="nav-btn" onclick="navigate(-1)">&#8249;</button>
-      <span class="nav-label" id="nav-label"></span>
+      <span class="nav-label" id="nav-label" onclick="openDatePicker(event)"></span>
       <button class="nav-btn" onclick="navigate(1)">&#8250;</button>
       <button class="today-btn" onclick="goToday()">오늘</button>
     </div>
@@ -369,6 +395,16 @@
   <button class="profile-save-btn" onclick="saveName()">저장</button>
   <div class="profile-divider"></div>
   <button class="profile-signout-btn" onclick="signOutUser()">로그아웃</button>
+</div>
+
+<!-- Date picker -->
+<div id="date-picker" class="date-picker hidden">
+  <div class="dp-year-row">
+    <button class="dp-yr-btn" onclick="dpShiftYear(-1)">&#8249;</button>
+    <span class="dp-year-label" id="dp-year-label"></span>
+    <button class="dp-yr-btn" onclick="dpShiftYear(1)">&#8250;</button>
+  </div>
+  <div class="dp-months" id="dp-months"></div>
 </div>
 
 <!-- Modal -->
@@ -536,7 +572,7 @@ auth.onAuthStateChanged(async user => {
 });
 
 // ── Constants ──────────────────────────────────────────────
-const HOUR_H = 80, START_H = 8, END_H = 22, TOTAL_H = 14;
+const HOUR_H = 80, START_H = 6, END_H = 22, TOTAL_H = 16;
 const SCHED_H = TOTAL_H * HOUR_H, PPM = HOUR_H / 60;
 
 const DAY_KO   = ['일','월','화','수','목','금','토'];
@@ -738,10 +774,7 @@ function render() {
     const cls=['day-header',isToday(d)?'today':'',dow===6?'sat':'',dow===0?'sun':''].filter(Boolean).join(' ');
     return `<div class="${cls}">
       <div class="day-name">${DAY_KO[dow]}</div>
-      <div class="day-num-row">
-        <span class="day-month">${d.getMonth()+1}월</span>
-        <span class="day-num">${d.getDate()}</span>
-      </div>
+      <div class="day-num">${d.getDate()}</div>
     </div>`;
   }).join('');
 
@@ -799,13 +832,17 @@ function renderBlock(s,d) {
 }
 
 // ── Navigation ─────────────────────────────────────────────
+function getWeekOfMonth(d) {
+  const firstDow=new Date(d.getFullYear(),d.getMonth(),1).getDay();
+  return Math.ceil((d.getDate()+(firstDow+6)%7)/7);
+}
 function updateNavLabel() {
   const el=document.getElementById('nav-label');
   if(view==='weekly'){
-    const days=weekDays(curDate),s=days[0],e=days[6];
-    el.textContent=s.getMonth()===e.getMonth()
-      ?`${s.getFullYear()}년 ${s.getMonth()+1}월 ${s.getDate()}–${e.getDate()}일`
-      :`${s.getMonth()+1}/${s.getDate()} – ${e.getMonth()+1}/${e.getDate()}`;
+    const days=weekDays(curDate);
+    const mid=days[3]; // 목요일 기준으로 월 결정
+    const wk=getWeekOfMonth(mid);
+    el.textContent=`${mid.getFullYear()}년 ${mid.getMonth()+1}월 ${wk}째주`;
   } else {
     const d=curDate;
     el.textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${DAY_FULL[d.getDay()]}`;
@@ -815,6 +852,43 @@ function navigate(dir){
   const d=new Date(curDate);d.setDate(d.getDate()+(view==='weekly'?dir*7:dir));curDate=d;render();
 }
 function goToday(){curDate=today0();render();}
+
+// ── Date picker ────────────────────────────────────────────
+let dpPickYear=new Date().getFullYear();
+function openDatePicker(e){
+  if(e) e.stopPropagation();
+  const picker=document.getElementById('date-picker');
+  const isHidden=picker.classList.contains('hidden');
+  closeDatePicker();
+  if(!isHidden) return;
+  dpPickYear=curDate.getFullYear();
+  const label=document.getElementById('nav-label');
+  const rect=label.getBoundingClientRect();
+  picker.style.top=(rect.bottom+6)+'px';
+  picker.style.left=Math.max(8,rect.left+rect.width/2-118)+'px';
+  renderDatePicker();
+  picker.classList.remove('hidden');
+}
+function closeDatePicker(){
+  document.getElementById('date-picker').classList.add('hidden');
+}
+function dpShiftYear(delta){
+  dpPickYear+=delta;
+  renderDatePicker();
+}
+function renderDatePicker(){
+  document.getElementById('dp-year-label').textContent=dpPickYear+'년';
+  const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const cy=curDate.getFullYear(),cm=curDate.getMonth();
+  document.getElementById('dp-months').innerHTML=months.map((m,i)=>
+    `<button class="dp-mon-btn${dpPickYear===cy&&i===cm?' cur':''}" onclick="dpSelectMonth(${i})">${m}</button>`
+  ).join('');
+}
+function dpSelectMonth(mon){
+  curDate=new Date(dpPickYear,mon,1);
+  closeDatePicker();
+  render();
+}
 function setView(v){
   view=v;
   document.getElementById('tab-weekly').className='tab'+(v==='weekly'?' active':'');
@@ -1137,6 +1211,9 @@ document.addEventListener('click',e=>{
   const menu=document.getElementById('profile-menu');
   if(!menu.classList.contains('hidden')&&!e.target.closest('#profile-menu')&&!e.target.closest('#user-avatar'))
     menu.classList.add('hidden');
+  const picker=document.getElementById('date-picker');
+  if(!picker.classList.contains('hidden')&&!e.target.closest('#date-picker')&&!e.target.closest('#nav-label'))
+    closeDatePicker();
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') closeModal();
