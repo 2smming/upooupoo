@@ -794,7 +794,14 @@ function render() {
 
   const cols=days.map(d=>{
     const ds=fmtDate(d);
-    const blks=sessions.filter(s=>sessionMatchesDate(s,d)).map(s=>renderBlock(s,d)).join('');
+    const flat=[];
+    sessions.filter(s=>sessionMatchesDate(s,d)).forEach(s=>{
+      getBlockTimesAll(s,d).forEach(({start,end,capacity})=>{
+        flat.push({s,start,end,capacity,_col:0,_totalCols:1});
+      });
+    });
+    assignLayout(flat);
+    const blks=flat.map(renderFlatBlock).join('');
     const nl=(isToday(d)&&showNow)?`<div class="now-line" style="top:${nowTop}px"></div>`:'';
     return `<div class="day-column" onclick="colClick(event,'${ds}')">${nl}${blks}</div>`;
   }).join('');
@@ -807,28 +814,54 @@ function render() {
     </div>`;
 }
 
-function renderBlock(s,d) {
+function assignLayout(blocks) {
+  if(!blocks.length) return;
+  blocks.sort((a,b)=>t2m(a.start)-t2m(b.start));
+  const colEnds=[];
+  for(const b of blocks){
+    const sm=t2m(b.start);
+    let placed=false;
+    for(let c=0;c<colEnds.length;c++){
+      if(colEnds[c]<=sm){b._col=c;colEnds[c]=t2m(b.end);placed=true;break;}
+    }
+    if(!placed){b._col=colEnds.length;colEnds.push(t2m(b.end));}
+  }
+  for(const b of blocks){
+    const sm=t2m(b.start),em=t2m(b.end);
+    let maxCol=b._col;
+    for(const o of blocks){
+      if(o!==b&&t2m(o.start)<em&&sm<t2m(o.end)) maxCol=Math.max(maxCol,o._col);
+    }
+    b._totalCols=maxCol+1;
+  }
+}
+
+function renderFlatBlock({s,start,end,capacity,_col,_totalCols}) {
   const c=PALETTE[s.colorIdx||0];
   const isRecur=s.recurrence&&s.recurrence.type!=='none';
-  const lanesStr=s.lanes?`레인 ${s.lanes}개`:'';
-  const priceStr=s.price?fmtPrice(s.price):'';
-  const staTags=toArr(s.station),locTags=toArr(s.location);
-  const meta2=staTags.length?`🚇 ${staTags.join(' · ')}`:locTags.length?`📍 ${locTags.join(' · ')}`:'';
-  return getBlockTimesAll(s,d).map(({start,end,capacity})=>{
-    const capStr=capacity?`${capacity}명`:'';
-    const meta1=[lanesStr,capStr,priceStr].filter(Boolean).join(' · ');
-    const sm=t2m(start),em=t2m(end);
-    const top=(sm-START_H*60)*PPM,h=(em-sm)*PPM;
+  const overlapping=_totalCols>1;
+  const sm=t2m(start),em=t2m(end);
+  const top=(sm-START_H*60)*PPM,h=(em-sm)*PPM;
+  const pct=100/_totalCols;
+  const L=_col===0?'3px':`calc(${_col*pct}% + 2px)`;
+  const R=_col===_totalCols-1?'3px':`calc(${(_totalCols-_col-1)*pct}% + 2px)`;
+  let inner=`<div class="s-name">${esc(s.pool)}${isRecur?`<span class="recur-icon">↻</span>`:''}</div>`;
+  if(!overlapping){
     const tiny=h<26,small=h<48,med=h<72,big=h>=90;
-    let inner=`<div class="s-name">${esc(s.pool)}${isRecur?`<span class="recur-icon">↻</span>`:''}</div>`;
+    const lanesStr=s.lanes?`레인 ${s.lanes}개`:'';
+    const capStr=capacity?`${capacity}명`:'';
+    const priceStr=s.price?fmtPrice(s.price):'';
+    const meta1=[lanesStr,capStr,priceStr].filter(Boolean).join(' · ');
+    const staTags=toArr(s.station),locTags=toArr(s.location);
+    const meta2=staTags.length?`🚇 ${staTags.join(' · ')}`:locTags.length?`📍 ${locTags.join(' · ')}`:'';
     if(!tiny)          inner+=`<div class="s-time">${start}–${end}</div>`;
     if(!small&&meta1)  inner+=`<div class="s-meta">${esc(meta1)}</div>`;
     if(!med  &&meta2)  inner+=`<div class="s-meta">${esc(meta2)}</div>`;
     if(big   &&s.notes)inner+=`<div class="s-meta">${esc(s.notes)}</div>`;
-    return `<div class="session-block"
-      style="top:${top}px;height:${h}px;background:${c.bg};color:${c.text};border-left-color:${c.border};"
-      onclick="event.stopPropagation();editSession('${s.id}')">${inner}</div>`;
-  }).join('');
+  }
+  return `<div class="session-block"
+    style="top:${top}px;height:${h}px;left:${L};right:${R};background:${c.bg};color:${c.text};border-left-color:${c.border};"
+    onclick="event.stopPropagation();editSession('${s.id}')">${inner}</div>`;
 }
 
 // ── Navigation ─────────────────────────────────────────────
