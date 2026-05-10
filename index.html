@@ -489,7 +489,7 @@
           <input id="f-lanes" type="number" min="1" max="50" placeholder="개" />
         </div>
         <div class="form-group">
-          <label>요금</label>
+          <label>요금 *</label>
           <div class="input-suffix-wrap">
             <input id="f-price" type="text" inputmode="numeric" placeholder="0" oninput="fmtPriceInput(this)" />
             <span class="input-suffix">원</span>
@@ -1130,6 +1130,7 @@ function saveSession(){
   const notes=document.getElementById('f-notes').value.trim();
 
   if(!pool){document.getElementById('f-pool').focus();return;}
+  if(!price){document.getElementById('f-price').focus();return;}
   if(!weeklyEnabled&&!monthlyEnabled){alert('매주 또는 매월을 하나 이상 활성화해 주세요.');return;}
 
   let recurrence, startTime, endTime;
