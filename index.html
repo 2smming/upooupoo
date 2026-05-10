@@ -470,9 +470,8 @@ const db   = firebase.firestore();
 let currentUser = null;
 
 function signIn() {
-  auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(console.error);
 }
-auth.getRedirectResult().catch(console.error);
 function signOutUser() {
   auth.signOut();
 }
