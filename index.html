@@ -268,24 +268,55 @@
       transition: background 0.15s; white-space: nowrap;
     }
     .auth-btn:hover { background: #e0e7ff; }
-    .auth-btn.out { background: rgba(255,255,255,0.15); color: white; }
-    .auth-btn.out:hover { background: rgba(255,255,255,0.28); }
-    .user-avatar { width:28px; height:28px; border-radius:50%; border:2px solid rgba(255,255,255,0.5); object-fit:cover; }
-    .user-name { font-size:12px; color:rgba(255,255,255,0.9); max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .user-avatar {
+      width:32px; height:32px; border-radius:50%;
+      border:2px solid rgba(255,255,255,0.6); object-fit:cover;
+      cursor:pointer; transition: transform 0.15s;
+    }
+    .user-avatar:hover { transform: scale(1.08); }
+
+    /* ── Profile dropdown ── */
+    .profile-menu {
+      position: fixed; top: 66px; right: 16px;
+      background: white; border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+      padding: 18px 16px 14px; z-index: 300; width: 210px;
+    }
+    .profile-menu-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      display: block; margin: 0 auto 10px; object-fit: cover;
+      border: 2px solid #e2e8f0;
+    }
+    .profile-name-label {
+      font-size: 11px; font-weight: 700; color: #64748b;
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;
+    }
+    .profile-name-input {
+      width: 100%; padding: 7px 10px; border: 1.5px solid #e2e8f0;
+      border-radius: 8px; font-size: 14px; font-family: inherit;
+      color: #1e293b; outline: none; transition: border-color 0.15s;
+    }
+    .profile-name-input:focus { border-color: #3b82f6; }
+    .profile-save-btn {
+      width: 100%; margin-top: 8px; padding: 8px;
+      background: #1d4ed8; color: white; border: none;
+      border-radius: 8px; font-size: 13px; font-weight: 700;
+      font-family: inherit; cursor: pointer; transition: filter 0.12s;
+    }
+    .profile-save-btn:hover { filter: brightness(0.92); }
+    .profile-divider { height: 1px; background: #f1f5f9; margin: 12px 0; }
+    .profile-signout-btn {
+      width: 100%; padding: 7px; background: #f8fafc; color: #64748b;
+      border: none; border-radius: 8px; font-size: 12px; font-weight: 600;
+      font-family: inherit; cursor: pointer; transition: background 0.12s;
+    }
+    .profile-signout-btn:hover { background: #fee2e2; color: #e11d48; }
   </style>
 </head>
 <body>
 
 <header class="header">
   <div class="header-title">🏊 자유수영 스케줄</div>
-  <div class="auth-area">
-    <button class="auth-btn" id="signin-btn" onclick="signIn()">Google 로그인</button>
-    <div id="user-info" class="hidden" style="display:flex;align-items:center;gap:7px">
-      <img class="user-avatar" id="user-avatar" src="" alt="" />
-      <span class="user-name" id="user-name"></span>
-      <button class="auth-btn out" onclick="signOutUser()">로그아웃</button>
-    </div>
-  </div>
   <div class="header-right">
     <div class="tabs">
       <button class="tab active" id="tab-weekly" onclick="setView('weekly')">주간</button>
@@ -297,6 +328,12 @@
       <button class="nav-btn" onclick="navigate(1)">&#8250;</button>
       <button class="today-btn" onclick="goToday()">오늘</button>
     </div>
+    <div class="auth-area">
+      <button class="auth-btn" id="signin-btn" onclick="signIn()">로그인</button>
+      <div id="user-info" class="hidden">
+        <img class="user-avatar" id="user-avatar" src="" alt="" onclick="toggleProfileMenu(event)" />
+      </div>
+    </div>
   </div>
 </header>
 
@@ -304,6 +341,16 @@
   <div class="schedule-inner" id="schedule-inner"></div>
 </div>
 <button class="fab" title="일정 추가" onclick="openModal(null,null,null)">+</button>
+
+<!-- Profile dropdown -->
+<div id="profile-menu" class="profile-menu hidden">
+  <img class="profile-menu-avatar" id="profile-menu-avatar" src="" alt="" />
+  <div class="profile-name-label">이름</div>
+  <input class="profile-name-input" id="profile-name-input" type="text" placeholder="이름을 입력하세요" />
+  <button class="profile-save-btn" onclick="saveName()">저장</button>
+  <div class="profile-divider"></div>
+  <button class="profile-signout-btn" onclick="signOutUser()">로그아웃</button>
+</div>
 
 <!-- Modal -->
 <div class="overlay hidden" id="overlay">
@@ -423,8 +470,9 @@ const db   = firebase.firestore();
 let currentUser = null;
 
 function signIn() {
-  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(console.error);
+  auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider());
 }
+auth.getRedirectResult().catch(console.error);
 function signOutUser() {
   auth.signOut();
 }
@@ -433,11 +481,24 @@ function updateAuthUI(user) {
   const info = document.getElementById('user-info');
   if (user) {
     btn.classList.add('hidden'); info.classList.remove('hidden');
-    document.getElementById('user-avatar').src = user.photoURL||'';
-    document.getElementById('user-name').textContent  = user.displayName||user.email;
+    const photo = user.photoURL||'';
+    document.getElementById('user-avatar').src = photo;
+    document.getElementById('profile-menu-avatar').src = photo;
+    document.getElementById('profile-name-input').value = user.displayName||'';
   } else {
     btn.classList.remove('hidden'); info.classList.add('hidden');
+    document.getElementById('profile-menu').classList.add('hidden');
   }
+}
+function toggleProfileMenu(e) {
+  if(e) e.stopPropagation();
+  document.getElementById('profile-menu').classList.toggle('hidden');
+}
+async function saveName() {
+  const name = document.getElementById('profile-name-input').value.trim();
+  if(!name||!currentUser) return;
+  await currentUser.updateProfile({displayName: name}).catch(console.error);
+  document.getElementById('profile-menu').classList.add('hidden');
 }
 auth.onAuthStateChanged(async user => {
   currentUser = user;
@@ -983,6 +1044,11 @@ function deleteSession(id){
 // ── Init ───────────────────────────────────────────────────
 document.getElementById('overlay').addEventListener('click',e=>{
   if(e.target===document.getElementById('overlay')) closeModal();
+});
+document.addEventListener('click',e=>{
+  const menu=document.getElementById('profile-menu');
+  if(!menu.classList.contains('hidden')&&!e.target.closest('#profile-menu')&&!e.target.closest('#user-avatar'))
+    menu.classList.add('hidden');
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') closeModal();
