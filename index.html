@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>자유수영 스케줄</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Segoe UI', sans-serif;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
       background: #f1f5f9; color: #1e293b; height: 100vh; display: flex; flex-direction: column;
     }
 
@@ -17,8 +18,9 @@
       display: flex; align-items: center; justify-content: space-between;
       flex-shrink: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.18); gap: 12px;
     }
-    .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; white-space: nowrap; }
-    .header-right { display: flex; align-items: center; gap: 14px; }
+    .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; white-space: nowrap; flex:1; }
+    .header-center { display: flex; align-items: center; gap: 12px; }
+    .header-right  { flex:1; display: flex; align-items: center; justify-content: flex-end; }
     .tabs { display: flex; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 3px; gap: 2px; }
     .tab {
       padding: 4px 14px; border: none; background: transparent;
@@ -34,7 +36,7 @@
       transition: background 0.15s; line-height: 1;
     }
     .nav-btn:hover { background: rgba(255,255,255,0.28); }
-    .nav-label { font-size: 13px; font-weight: 600; min-width: 150px; text-align: center; }
+    .nav-label { font-size: 13px; font-weight: 600; min-width: 130px; text-align: center; }
     .today-btn {
       background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35);
       color: white; padding: 3px 11px; border-radius: 6px; cursor: pointer;
@@ -52,8 +54,9 @@
     .time-corner { width: 60px; flex-shrink: 0; border-right: 1px solid #e2e8f0; }
     .day-header { flex: 1; padding: 8px 4px; text-align: center; border-right: 1px solid #e2e8f0; user-select: none; }
     .day-header .day-name  { font-size: 11px; color: #94a3b8; font-weight: 500; letter-spacing: 0.04em; }
+    .day-num-row { display: flex; align-items: baseline; justify-content: center; gap: 3px; }
+    .day-header .day-month { font-size: 10px; color: #94a3b8; font-weight: 500; }
     .day-header .day-num   { font-size: 22px; font-weight: 700; line-height: 1.25; color: #334155; }
-    .day-header .day-month { font-size: 10px; color: #94a3b8; margin-top: 1px; }
     .day-header.today .day-num {
       color: white; background: #1d4ed8; width: 34px; height: 34px;
       border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px;
@@ -317,7 +320,7 @@
 
 <header class="header">
   <div class="header-title">🏊 자유수영 스케줄</div>
-  <div class="header-right">
+  <div class="header-center">
     <div class="tabs">
       <button class="tab active" id="tab-weekly" onclick="setView('weekly')">주간</button>
       <button class="tab"        id="tab-daily"  onclick="setView('daily')">일간</button>
@@ -328,9 +331,11 @@
       <button class="nav-btn" onclick="navigate(1)">&#8250;</button>
       <button class="today-btn" onclick="goToday()">오늘</button>
     </div>
+  </div>
+  <div class="header-right">
     <div class="auth-area">
       <button class="auth-btn" id="signin-btn" onclick="signIn()">로그인</button>
-      <div id="user-info" class="hidden">
+      <div id="user-info" style="display:none">
         <img class="user-avatar" id="user-avatar" src="" alt="" onclick="toggleProfileMenu(event)" />
       </div>
     </div>
@@ -479,13 +484,15 @@ function updateAuthUI(user) {
   const btn  = document.getElementById('signin-btn');
   const info = document.getElementById('user-info');
   if (user) {
-    btn.classList.add('hidden'); info.classList.remove('hidden');
+    btn.style.display = 'none';
+    info.style.display = 'flex';
     const photo = user.photoURL||'';
     document.getElementById('user-avatar').src = photo;
     document.getElementById('profile-menu-avatar').src = photo;
     document.getElementById('profile-name-input').value = user.displayName||'';
   } else {
-    btn.classList.remove('hidden'); info.classList.add('hidden');
+    btn.style.display = '';
+    info.style.display = 'none';
     document.getElementById('profile-menu').classList.add('hidden');
   }
 }
@@ -687,8 +694,10 @@ function render() {
     const cls=['day-header',isToday(d)?'today':'',dow===6?'sat':'',dow===0?'sun':''].filter(Boolean).join(' ');
     return `<div class="${cls}">
       <div class="day-name">${DAY_KO[dow]}</div>
-      <div class="day-num">${d.getDate()}</div>
-      <div class="day-month">${d.getMonth()+1}월</div>
+      <div class="day-num-row">
+        <span class="day-month">${d.getMonth()+1}월</span>
+        <span class="day-num">${d.getDate()}</span>
+      </div>
     </div>`;
   }).join('');
 
