@@ -355,6 +355,36 @@
     }
     .dp-mon-btn:hover { background: #e0f3fa; color: #2a7fa0; }
     .dp-mon-btn.cur { background: #3d9ec0; color: white; }
+
+    /* ── Export button & menu ── */
+    .export-btn {
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.35);
+      color: white; width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; flex-shrink: 0;
+    }
+    .export-btn:hover { background: rgba(255,255,255,0.28); }
+    .export-menu {
+      position: fixed; background: white; border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18); padding: 16px;
+      z-index: 400; width: 190px;
+    }
+    .export-menu-title { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 10px; }
+    .export-check-label {
+      display: flex; align-items: center; gap: 8px; padding: 7px 4px;
+      cursor: pointer; border-radius: 8px; transition: background 0.12s;
+      font-size: 14px; font-weight: 500; color: #334155;
+    }
+    .export-check-label:hover { background: #f1f5f9; }
+    .export-check-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: #3d9ec0; cursor: pointer; }
+    .export-dl-btn {
+      width: 100%; margin-top: 12px; padding: 9px;
+      background: #3d9ec0; color: white; border: none;
+      border-radius: 8px; font-size: 13px; font-weight: 700;
+      font-family: inherit; cursor: pointer; transition: filter 0.12s;
+    }
+    .export-dl-btn:hover { filter: brightness(0.92); }
+    .export-dl-btn:disabled { opacity: 0.6; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -374,6 +404,13 @@
     </div>
   </div>
   <div class="auth-area">
+    <button class="export-btn" id="export-btn" title="이미지로 저장" onclick="openExportMenu(event)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+    </button>
     <button class="auth-btn" id="signin-btn" onclick="signIn()">로그인</button>
     <div id="user-info" style="display:none">
       <img class="user-avatar" id="user-avatar" src="" alt="" onclick="toggleProfileMenu(event)" />
@@ -394,6 +431,14 @@
   <button class="profile-save-btn" onclick="saveName()">저장</button>
   <div class="profile-divider"></div>
   <button class="profile-signout-btn" onclick="signOutUser()">로그아웃</button>
+</div>
+
+<!-- Export menu -->
+<div id="export-menu" class="export-menu hidden">
+  <div class="export-menu-title">뷰 선택</div>
+  <label class="export-check-label"><input type="checkbox" id="exp-weekday" checked /> 평일</label>
+  <label class="export-check-label"><input type="checkbox" id="exp-weekend" /> 주말</label>
+  <button class="export-dl-btn" id="export-dl-btn" onclick="doExport()">이미지 저장</button>
 </div>
 
 <!-- Date picker -->
@@ -514,6 +559,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -1270,6 +1316,57 @@ function deleteSession(id){
   saveSessions();closeModal();render();
 }
 
+// ── Export ─────────────────────────────────────────────────
+function openExportMenu(e) {
+  if(e) e.stopPropagation();
+  const menu=document.getElementById('export-menu');
+  const isHidden=menu.classList.contains('hidden');
+  closeExportMenu();
+  if(!isHidden) return;
+  const btn=document.getElementById('export-btn');
+  const rect=btn.getBoundingClientRect();
+  menu.style.top=(rect.bottom+6)+'px';
+  menu.style.right=(window.innerWidth-rect.right)+'px';
+  menu.style.left='auto';
+  menu.classList.remove('hidden');
+}
+function closeExportMenu() {
+  document.getElementById('export-menu').classList.add('hidden');
+}
+async function doExport() {
+  const wkday=document.getElementById('exp-weekday').checked;
+  const wkend=document.getElementById('exp-weekend').checked;
+  if(!wkday&&!wkend){alert('평일 또는 주말을 선택해 주세요.');return;}
+  const dlBtn=document.getElementById('export-dl-btn');
+  dlBtn.disabled=true; dlBtn.textContent='저장 중…';
+  closeExportMenu();
+  const origView=view;
+  const inner=document.getElementById('schedule-inner');
+  try {
+    if(wkday){
+      setView('weekday');
+      await new Promise(r=>setTimeout(r,120));
+      const canvas=await html2canvas(inner,{scale:2,useCORS:true,backgroundColor:'#fafcfe',logging:false});
+      downloadCanvas(canvas,'자유수영_평일.png');
+    }
+    if(wkend){
+      setView('weekend');
+      await new Promise(r=>setTimeout(r,120));
+      const canvas=await html2canvas(inner,{scale:2,useCORS:true,backgroundColor:'#fafcfe',logging:false});
+      downloadCanvas(canvas,'자유수영_주말.png');
+    }
+  } finally {
+    setView(origView);
+    dlBtn.disabled=false; dlBtn.textContent='이미지 저장';
+  }
+}
+function downloadCanvas(canvas,filename) {
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  a.download=filename;
+  a.click();
+}
+
 // ── Init ───────────────────────────────────────────────────
 document.getElementById('overlay').addEventListener('click',e=>{
   if(e.target===document.getElementById('overlay')) closeModal();
@@ -1281,6 +1378,9 @@ document.addEventListener('click',e=>{
   const picker=document.getElementById('date-picker');
   if(!picker.classList.contains('hidden')&&!e.target.closest('#date-picker')&&!e.target.closest('#nav-label'))
     closeDatePicker();
+  const expMenu=document.getElementById('export-menu');
+  if(!expMenu.classList.contains('hidden')&&!e.target.closest('#export-menu')&&!e.target.closest('#export-btn'))
+    closeExportMenu();
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') closeModal();
