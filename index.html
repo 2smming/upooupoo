@@ -82,6 +82,8 @@
     .grid-line.half { background: #eef6fa; }
     .day-column { flex: 1; border-right: 1px solid #e2e8f0; position: relative; cursor: crosshair; }
     .day-column:last-child { border-right: none; }
+    .day-header.wide { flex: 2; }
+    .day-column.wide { flex: 2; }
     .now-line { position: absolute; left: 0; right: 0; height: 2px; background: #ef4444; z-index: 15; pointer-events: none; }
     .now-line::before {
       content: ''; position: absolute; left: -3px; top: -4px;
@@ -361,8 +363,8 @@
   <div class="header-left">
     <div class="header-title">어푸어푸 자유수영</div>
     <div class="tabs">
-      <button class="tab active" id="tab-weekly" onclick="setView('weekly')">주간</button>
-      <button class="tab"        id="tab-daily"  onclick="setView('daily')">일간</button>
+      <button class="tab active" id="tab-weekday" onclick="setView('weekday')">평일</button>
+      <button class="tab"        id="tab-weekend" onclick="setView('weekend')">주말</button>
     </div>
     <div class="nav-group">
       <button class="nav-btn" onclick="navigate(-1)">&#8249;</button>
@@ -588,7 +590,7 @@ const PALETTE = [
 
 // ── State ──────────────────────────────────────────────────
 let sessions       = [];
-let view           = 'weekly';
+let view           = 'weekday';
 let curDate        = today0();
 let editId         = null;
 let weeklyEnabled  = true;
@@ -617,6 +619,16 @@ function weekStart(d) {
 function weekDays(d) {
   const s=weekStart(d);
   return Array.from({length:7},(_,i)=>{ const x=new Date(s); x.setDate(s.getDate()+i); return x; });
+}
+function weekdayDays(d) {
+  const s=weekStart(d);
+  return Array.from({length:5},(_,i)=>{ const x=new Date(s); x.setDate(s.getDate()+i); return x; });
+}
+function weekendDays(d) {
+  const s=weekStart(d);
+  const sat=new Date(s); sat.setDate(s.getDate()+5);
+  const sun=new Date(s); sun.setDate(s.getDate()+6);
+  return [sat,sun];
 }
 function isToday(d) {
   const t=new Date();
@@ -769,11 +781,12 @@ function getBlockTimesAll(s,d) {
 // ── Render ─────────────────────────────────────────────────
 function render() {
   updateNavLabel();
-  const days=view==='weekly'?weekDays(curDate):[curDate];
+  const days=view==='weekday'?weekdayDays(curDate):weekendDays(curDate);
 
   const headers=days.map(d=>{
     const dow=d.getDay();
-    const cls=['day-header',isToday(d)?'today':'',dow===6?'sat':'',dow===0?'sun':''].filter(Boolean).join(' ');
+    const wide=view==='weekend'&&dow===6;
+    const cls=['day-header',wide?'wide':'',isToday(d)?'today':'',dow===6?'sat':'',dow===0?'sun':''].filter(Boolean).join(' ');
     return `<div class="${cls}">
       <div class="day-name">${DAY_KO[dow]}</div>
       <div class="day-num">${d.getDate()}</div>
@@ -806,7 +819,8 @@ function render() {
     assignLayout(flat);
     const blks=flat.map(renderFlatBlock).join('');
     const nl=(isToday(d)&&showNow)?`<div class="now-line" style="top:${nowTop}px"></div>`:'';
-    return `<div class="day-column" onclick="colClick(event,'${ds}')">${nl}${blks}</div>`;
+    const wide=view==='weekend'&&d.getDay()===6;
+    return `<div class="day-column${wide?' wide':''}" onclick="colClick(event,'${ds}')">${nl}${blks}</div>`;
   }).join('');
 
   document.getElementById('schedule-inner').innerHTML=`
@@ -874,18 +888,20 @@ function getWeekOfMonth(d) {
 }
 function updateNavLabel() {
   const el=document.getElementById('nav-label');
-  if(view==='weekly'){
-    const days=weekDays(curDate);
-    const mid=days[3];
+  if(view==='weekday'){
+    const days=weekdayDays(curDate);
+    const mid=days[2];
     const wk=getWeekOfMonth(mid);
     el.textContent=`${mid.getMonth()+1}월 ${wk}째주`;
   } else {
-    const d=curDate;
-    el.textContent=`${d.getMonth()+1}월 ${d.getDate()}일 ${DAY_FULL[d.getDay()]}`;
+    const days=weekendDays(curDate);
+    const sat=days[0];
+    const wk=getWeekOfMonth(sat);
+    el.textContent=`${sat.getMonth()+1}월 ${wk}째주 주말`;
   }
 }
 function navigate(dir){
-  const d=new Date(curDate);d.setDate(d.getDate()+(view==='weekly'?dir*7:dir));curDate=d;render();
+  const d=new Date(curDate);d.setDate(d.getDate()+dir*7);curDate=d;render();
 }
 function goToday(){curDate=today0();render();}
 
@@ -927,8 +943,8 @@ function dpSelectMonth(mon){
 }
 function setView(v){
   view=v;
-  document.getElementById('tab-weekly').className='tab'+(v==='weekly'?' active':'');
-  document.getElementById('tab-daily' ).className='tab'+(v==='daily' ?' active':'');
+  document.getElementById('tab-weekday').className='tab'+(v==='weekday'?' active':'');
+  document.getElementById('tab-weekend').className='tab'+(v==='weekend'?' active':'');
   render();
 }
 
