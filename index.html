@@ -1342,18 +1342,35 @@ async function doExport() {
   closeExportMenu();
   const origView=view;
   const inner=document.getElementById('schedule-inner');
+  const opts={scale:2,useCORS:true,backgroundColor:'#fafcfe',logging:false};
   try {
-    if(wkday){
+    if(wkday&&wkend){
+      // 평일 + 주말 → 월~일 한 장으로 합치기
       setView('weekday');
       await new Promise(r=>setTimeout(r,120));
-      const canvas=await html2canvas(inner,{scale:2,useCORS:true,backgroundColor:'#fafcfe',logging:false});
-      downloadCanvas(canvas,'자유수영_평일.png');
-    }
-    if(wkend){
+      const c1=await html2canvas(inner,opts);
       setView('weekend');
       await new Promise(r=>setTimeout(r,120));
-      const canvas=await html2canvas(inner,{scale:2,useCORS:true,backgroundColor:'#fafcfe',logging:false});
-      downloadCanvas(canvas,'자유수영_주말.png');
+      const c2=await html2canvas(inner,opts);
+      // c2의 시간 컬럼(60px * scale 2 = 120px)을 제외하고 우측에 붙이기
+      const timeColPx=60*2;
+      const combined=document.createElement('canvas');
+      combined.width=c1.width+(c2.width-timeColPx);
+      combined.height=Math.max(c1.height,c2.height);
+      const ctx=combined.getContext('2d');
+      ctx.fillStyle='#fafcfe';
+      ctx.fillRect(0,0,combined.width,combined.height);
+      ctx.drawImage(c1,0,0);
+      ctx.drawImage(c2,timeColPx,0,c2.width-timeColPx,c2.height,c1.width,0,c2.width-timeColPx,c2.height);
+      downloadCanvas(combined,'자유수영_전체.png');
+    } else if(wkday){
+      setView('weekday');
+      await new Promise(r=>setTimeout(r,120));
+      downloadCanvas(await html2canvas(inner,opts),'자유수영_평일.png');
+    } else {
+      setView('weekend');
+      await new Promise(r=>setTimeout(r,120));
+      downloadCanvas(await html2canvas(inner,opts),'자유수영_주말.png');
     }
   } finally {
     setView(origView);
